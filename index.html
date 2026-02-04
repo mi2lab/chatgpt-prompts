@@ -1,0 +1,494 @@
+<title>ChatGPT Blocks</title>
+<link href="index.css" rel="stylesheet" />
+<script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+<script src="lib/speech.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
+<div id="toolbar">
+    <span id="new-block" title="Create New Block">🆕</span>
+    <span id="del-block" title="Remove Block">🚮</span>
+    <span id="move-block-up" title="Move Block Down (Alt-Up)">⬆️</span>
+    <span id="move-block-down" title="Move Block Down (Alt-Down)">⬇️</span>
+    &nbsp;|&nbsp;
+    <span id="del-version" title="Remove Version">⏮️</span>
+    <span id="prev-version" title="Select Previous Version (Alt-Left)">⏪</span>
+    <span id="next-version" title="Select Next Version" (Alt-Down)>⏩</span>
+    <span id="new-version" title="Create New Version">▶️</span>
+    &nbsp;|&nbsp;
+    <!-- quick prompts will go here -->
+</div>
+<div id="blocks"></div>
+<script>
+    let speechEnabled = readStorage("speechEnabled", false);
+
+    const toolbarEl = document.querySelector("#toolbar");
+
+    const blocksEl = document.querySelector("#blocks");
+
+    function main() {
+        getPrompt(selectBlock(createBlock())).focus();
+
+        createInfo(`- This is a simple text editor that uses **ChatGPT** to help you revise your text.
+- You can edit any block by double-clicking on it.
+- Press Ctrl + Enter to create a new version of the block using ChatGPT.
+- Right-click on a block to use speech-to-text for revision instructions.
+- Press Escape to clear all active blocks.
+- Click on this info box to close it.`);
+    }
+
+    function selectBlock(blockEl = getBlock()) {
+        const currentBlockEl = document.querySelector(".selected-block");
+        currentBlockEl?.classList.remove("selected-block");
+
+        blockEl?.classList.add("selected-block");
+
+        return blockEl;
+    }
+
+
+    function createBlock(contents = "", prompt = "") {
+        const newBlockEl = createElement("div", "block");
+        newBlockEl.id = `block-${Date.now()}`;
+
+        const promptEl = createElement("div", "prompt");
+        promptEl.innerHTML = prompt;
+        promptEl.contentEditable = true;
+        promptEl.title = "Enter your prompt here";
+        newBlockEl.append(promptEl);
+
+        const currentBlockEl = getBlock();
+        if (currentBlockEl) {
+            currentBlockEl.after(newBlockEl);
+        } else {
+            blocksEl.append(newBlockEl);
+        }
+
+        selectVersion(createVersion(newBlockEl, contents));
+
+        return newBlockEl;
+    }
+
+    function createInfo(markdown, blockEl = getBlock()) {
+        const infoEl = createElement("div", "info");
+        infoEl.innerHTML = markdownToHTML(markdown);
+
+        infoEl.addEventListener("click", () => {
+            infoEl.remove();
+        });
+
+        setTimeout(() => infoEl.remove(), 15000);
+
+        getPrompt(blockEl).before(infoEl);
+
+        if (speechEnabled) {
+            textToSpeech(markdownToText(markdown));
+        }
+
+        return infoEl;
+    }
+
+    function moveBlock(dir = 1, blockEl = getBlock()) {
+        let nextBlockEl = dir > 0 ? blockEl?.nextElementSibling : blockEl?.previousElementSibling;
+
+        if (blockEl && nextBlockEl) {
+            if (dir < 0) {
+                nextBlockEl.before(blockEl);
+            } else if (dir > 0) {
+                nextBlockEl.after(blockEl);
+            }
+        }
+    }
+
+    function deleteBlock(blockEl = getBlock()) {
+        if (blockEl) {
+            // select next block
+            const nextBlockEl = blockEl.nextElementSibling || blockEl.previousElementSibling;
+            selectBlock(nextBlockEl);
+
+            // remove the block
+            blockEl.remove();
+        }
+    }
+
+    function selectVersion(versionEl) {
+        const currentVersionEl = getVersion(getBlock(versionEl));
+        currentVersionEl?.classList.remove("selected-version");
+
+        versionEl?.classList.add("selected-version");
+    }
+
+    function createVersion(blockEl = getBlock(), contents = "") {
+        let versionsEl = blockEl?.querySelector(".versions");
+        if (!versionsEl) {
+            versionsEl = createElement("div", "versions");
+            blockEl.append(versionsEl);
+        }
+
+        const newVersionEl = createElement("div", "version");
+        newVersionEl.innerHTML = contents;
+        newVersionEl.contentEditable = true;
+
+        newVersionEl.addEventListener("focus", () => {
+            selectBlock(blockEl);
+            selectVersion(newVersionEl);
+        });
+
+        versionsEl.append(newVersionEl);
+
+        return newVersionEl
+    }
+
+    function generateVersion(blockEl = getBlock()) {
+        const promptEl = getPrompt(blockEl);
+
+        if (promptEl) {
+            const promptText = promptEl.textContent;
+            const referenceText = getVersion(blockEl)?.textContent;
+
+            let prompt = referenceText ? `${promptText}:\n\n${referenceText}` : promptText;
+
+            promptEl.classList.add("active-prompt");
+
+            const newVersionEl = createVersion(blockEl);
+            newVersionEl.classList.add("new-version");
+
+            ChatGPT(prompt,
+                (result) => {
+                    promptEl.classList.remove("active-prompt");
+
+                    newVersionEl.innerHTML = markdownToHTML(result);
+                    newVersionEl.title = prompt;
+
+                    selectVersion(newVersionEl);
+                    newVersionEl.focus();
+                });
+
+            return newVersionEl;
+        }
+    }
+
+    function deleteVersion(versionEl = getVersion()) {
+        if (versionEl) {
+            const newVersionEl = versionEl.previousElementSibling
+                || versionEl.nextElementSibling;
+            if (newVersionEl) {
+                versionEl.remove();
+                selectVersion(newVersionEl);
+            }
+        }
+    }
+
+    function selectPrevVersion(blockEl = getBlock()) {
+        const currentVersionEl = getVersion(blockEl);
+
+        if (currentVersionEl) {
+            const prevVersionEl = currentVersionEl?.previousElementSibling;
+            if (prevVersionEl) {
+                currentVersionEl.classList.remove("selected-version");
+                prevVersionEl.classList.add("selected-version");
+
+                return prevVersionEl;
+            }
+        }
+    }
+
+    function selectNextVersion(blockEl = getBlock()) {
+        const currentVersionEl = getVersion(blockEl);
+
+        if (currentVersionEl) {
+            const nextVersionEl = currentVersionEl?.nextElementSibling;
+            if (nextVersionEl) {
+                currentVersionEl.classList.remove("selected-version");
+                nextVersionEl.classList.add("selected-version");
+
+                return nextVersionEl;
+            }
+        }
+    }
+
+    function getBlock(versionEl) {
+        if (versionEl) {
+            return versionEl?.closest(".block");
+        }
+        return document.querySelector(".selected-block");
+    }
+
+    function getPrompt(blockEl = getBlock()) {
+        return blockEl?.querySelector(".prompt");
+    }
+
+    function getVersion(blockEl = getBlock(), versionIndex = -1) {
+        if (versionIndex >= 0) {
+            const versions = blockEl?.querySelectorAll(".version");
+            return versions ? versions[versionIndex] : null;
+        }
+        return blockEl?.querySelector(".selected-version");
+    }
+
+    function markAsRead(blockOrVersionEl) {
+        if (blockOrVersionEl?.classList.contains("new-version")) {
+            blockOrVersionEl.classList.remove("new-version");
+        } else {
+            (blockOrVersionEl || document).querySelectorAll(".new-version").forEach((el) => {
+                el.classList.remove("new-version");
+            });
+        }
+    }
+
+    function toggleSpeech() {
+        speechEnabled = !speechEnabled;
+        writeStorage("speechEnabled", speechEnabled);
+
+        if (speechEnabled) {
+            textToSpeech("Voice enabled.");
+        } else {
+            textToSpeech("Voice disabled.");
+        }
+    }
+
+    /* toolbar event handlers */
+
+    const quickPrompts = {
+        "🧼": "Improve the overall flow and structure of the text; use full sentences",
+        "✅": "Provide an outline of the main points; use only bullet points",
+        "🎯": "Provide a summary of the main points but keep the examples; use full sentences",
+        "🔍": "Provide more detail for each of the points; use full sentences",
+        "🎓": "Make the text more formal and professional; use full sentences but avoid contractions",
+        "✂️": "Make the text more concise and to the point; use full sentences but remove any unnecessary words",
+        "💥": "Elaborate on the ideas presented in the text; use full sentences and add more examples and explanations",
+        "❓": "Identify two opportunities for improvement of the text",
+    };
+
+    for (const [key, value] of Object.entries(quickPrompts)) {
+        const quickPromptEl = createElement("span");
+        quickPromptEl.textContent = key;
+        quickPromptEl.title = `Prompt: ${value}`;
+
+        quickPromptEl.addEventListener("click", () => {
+            const promptEl = getPrompt();
+            if (promptEl) {
+                promptEl.textContent = value;
+
+                if (getVersion()) {
+                    generateVersion();
+                }
+            }
+        });
+
+        toolbarEl.append(quickPromptEl);
+    }
+
+    function updateToolbar() {
+
+    }
+
+    document.querySelector("#new-block").addEventListener("click", () => {
+        getPrompt(selectBlock(createBlock())).focus()
+    });
+
+    document.querySelector("#del-block").addEventListener("click", () => deleteBlock());
+
+    document.querySelector("#move-block-up").addEventListener("click", () => {
+        getPrompt(moveBlock(-1)).focus();;
+    });
+    document.querySelector("#move-block-down").addEventListener("click", () => {
+        getPrompt(moveBlock(1)).focus();
+    });
+
+    document.querySelector("#prev-version").addEventListener("click", () => {
+        selectPrevVersion().focus();
+    });
+    document.querySelector("#next-version").addEventListener("click", () => {
+        selectNextVersion().focus();
+    });
+
+    document.querySelector("#new-version").addEventListener("click", () => {
+        createVersion().focus();
+    });
+    document.querySelector("#del-version").addEventListener("click", () => deleteVersion());
+
+    /* editor event handlers */
+
+    document.addEventListener("keyup", (event) => {
+        // console.log(event.key);
+        switch (event.key) {
+            case "Escape":
+                selectBlock(null);
+                markAsRead();
+                break;
+            case "ArrowUp":
+                if (event.altKey) {
+                    getPrompt(moveBlock(-1)).focus();
+                    event.preventDefault();
+                }
+                break;
+            case "ArrowDown":
+                if (event.altKey) {
+                    getPrompt(moveBlock()).focus();
+                    event.preventDefault();
+                }
+                break;
+            case "ArrowLeft":
+                if (event.altKey) {
+                    selectPrevVersion()?.focus();
+                    event.preventDefault();
+                }
+                break;
+            case "ArrowRight":
+                if (event.altKey) {
+                    selectNextVersion()?.focus();
+                    event.preventDefault();
+                }
+                break;
+            case "Enter":
+                if (event.altKey) {
+                    getPrompt(selectBlock(createBlock())).focus();
+                    event.preventDefault();
+                } else if (event.ctrlKey) {
+                    generateVersion();
+                    event.preventDefault();
+                }
+                break;
+            case "`":
+                toggleSpeech();
+                break;
+        }
+    });
+
+    blocksEl.addEventListener("click", (event) => {
+        const blockEl = event.target.closest(".block");
+        const versionEl = event.target.closest(".version");
+
+        if (versionEl) {
+            markAsRead(versionEl);
+            selectVersion(versionEl);
+        } else {
+            markAsRead(blockEl);
+            selectBlock(blockEl);
+        }
+    });
+
+    blocksEl.addEventListener("dblclick", (event) => {
+        const blockEl = event.target.closest(".block");
+        if (blockEl) {
+            blockEl.querySelectorAll(".version:not(.selected-version)").forEach((versionEl) => {
+                if (!versionEl.classList.contains("collapsed-version")) {
+                    versionEl.classList.add("collapsed-version");
+                } else {
+                    versionEl.classList.remove("collapsed-version");
+                }
+            });
+        } else {
+            getPrompt(selectBlock(createBlock())).focus();
+        }
+    });
+
+    blocksEl.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+
+        const blockEl = event.target.closest(".block");
+
+        const selection = window.getSelection();
+
+        let contents;
+
+        if (!selection.isCollapsed && selection.rangeCount > 0) {
+            const tempEl = document.createElement("div");
+            const range = selection.getRangeAt(0);
+            if (event.altKey) {
+                tempEl.append(range.extractContents());
+            } else {
+                tempEl.append(range.cloneContents());
+            }
+            contents = tempEl.innerHTML;
+        } else {
+            contents = event.target.textContent;
+        }
+
+        const newBlockEl = createBlock(contents);
+        blockEl.after(newBlockEl);
+
+        selectBlock(newBlockEl);
+
+        const promptEl = getPrompt(newBlockEl);
+        promptEl.focus();
+    });
+
+    async function ChatGPT(prompt, cb) {
+        console.log("ChatGPT:", prompt);
+        try {
+            const response = await fetch("./openai/text", {
+                method: "POST", headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    "text": prompt
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Response status: ${response.status}`);
+            }
+
+            const result = await response.text();
+            console.log("OpenAI:", result);
+
+            if (typeof cb === "function") {
+                cb(result);
+            }
+        } catch (error) {
+            console.error(error.message);
+        }
+    }
+
+    /* utility functions */
+
+    function markdownToHTML(text) {
+        return marked.parse(text);
+    }
+
+    function markdownToText(markdown) {
+        const tempEl = document.createElement("div");
+        tempEl.innerHTML = markdownToHTML(markdown);
+        return tempEl.textContent;
+    }
+
+    function copyContents(el) {
+        const selection = window.getSelection();
+
+        let range = document.createRange();
+        range.selectNodeContents(el);
+
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        const selectedText = selection.toString();
+
+        try {
+            navigator.clipboard.writeText(selectedText);
+        } catch (err) {
+            console.error("Error", err);
+        }
+    }
+
+    function createElement(type = "div", className = "", id = "") {
+        const el = document.createElement(type);
+
+        el.className = className;
+        el.id = id;
+
+        return el;
+    }
+
+    function readStorage(key, defaultValue) {
+        const value = localStorage.getItem(key);
+        return value ? JSON.parse(value) : defaultValue;
+    }
+
+    function writeStorage(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    /* let's go... */
+
+    window.onload = main;
+</script>
