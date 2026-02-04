@@ -13,8 +13,6 @@ app.use(express.static('public'));
 // Mount the router at a base path
 app.use('/openai', openaiRoutes);
 
-console.log('Welcome to Smallville!');
-
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });

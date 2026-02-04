@@ -278,7 +278,24 @@
     }
 
     function updateToolbar() {
-
+        const blockEl = getBlock();
+        
+        if (blockEl) {
+            document.querySelector("#new-block").style.display = "block";
+            document.querySelector("#del-block").style.display = "block";
+            document.querySelector("#move-block-up").style.display = "block";
+            document.querySelector("#move-block-down").style.display = "block";
+            document.querySelector("#prev-version").style.display = "block";
+            document.querySelector("#next-version").style.display = "block";
+            document.querySelector("#new-version").style.display = "block";
+        } else {
+            document.querySelector("#new-block").style.display = "none";
+            document.querySelector("#del-block").style.display = "none";
+            document.querySelector("#move-block-up").style.display = "none";
+            document.querySelector("#move-block-down").style.display = "none";
+            document.querySelector("#prev-version").style.display = "none";
+            document.querySelector("#next-version").style.display = "none"; 
+        }
     }
 
     document.querySelector("#new-block").addEventListener("click", () => {
