@@ -6,9 +6,7 @@
     "body-parser": "^2.2.0",
     "express": "^4.21.2",
     "fs": "^0.0.1-security",
-    "openai": "^5.8.2"
-  },
-  "devDependencies": {
+    "openai": "^5.8.2",
     "nodemon": "^3.1.0"
   }
 }
