@@ -3,16 +3,16 @@ import OpenAI from "openai";
 import fs from "fs";
 import bodyParser from "body-parser";
 
+if (!process.env.OPENAI_API_KEY) {
+    console.error("NO OPENAI API KEY FOUND")
+}
+
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-if (!openai.apiKey) {
-    console.error("NO OPENAI API KEY FOUND")
-}
-
 // Create application/x-www-form-urlencoded parser
-const urlencodedParser = bodyParser.urlencoded()
+const parser = bodyParser.urlencoded()
 
 const router = express.Router();
 
@@ -38,7 +38,7 @@ router.post('/text', async (req, res) => {
     res.send(response.output_text);
 });
 
-router.post('/image', urlencodedParser, async (req, res) => {
+router.post('/image', parser, async (req, res) => {
     if (req.body) {
         if (req.body.text) {
             console.log(req.body.text);
@@ -65,7 +65,7 @@ router.post('/image', urlencodedParser, async (req, res) => {
     }
 });
 
-router.post('/image_gen', urlencodedParser, async (req, res) => {
+router.post('/image_gen', parser, async (req, res) => {
     if (req.body) {
         const prompt = req.body.text || "what's in this image?";
         if (prompt) {
