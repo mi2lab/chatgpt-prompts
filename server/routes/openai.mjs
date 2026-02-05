@@ -4,8 +4,12 @@ import fs from "fs";
 import bodyParser from "body-parser";
 
 const openai = new OpenAI({
-    apiKey: "YOUR_KEY_GOES_HERE",
+    apiKey: process.env.OPENAI_API_KEY,
 });
+
+if (!openai.apiKey) {
+    console.error("NO OPENAI API KEY FOUND")
+}
 
 // Create application/x-www-form-urlencoded parser
 const urlencodedParser = bodyParser.urlencoded()
