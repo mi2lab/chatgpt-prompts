@@ -4,7 +4,7 @@ import fs from "fs";
 import bodyParser from "body-parser";
 
 const openai = new OpenAI({
-    apiKey: "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",
+    apiKey: "YOUR_KEY_GOES_HERE",
 });
 
 // Create application/x-www-form-urlencoded parser
