@@ -14,7 +14,6 @@ jobs:
       - name: Install Dependencies and Run Code
         run: |
           npm install
-          node index.js
+          nodemon server/index.mjs
         env:
-          # Map the GitHub secret to an environment variable name (e.g., MY_API_KEY)
-          MY_API_KEY: ${{ secrets.API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
