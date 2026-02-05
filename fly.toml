@@ -4,7 +4,7 @@
 #
 
 app = 'chatgpt-prompts'
-primary_region = 'ord'
+primary_region = 'ams'
 
 [build]
 
